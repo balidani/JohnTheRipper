@@ -181,6 +181,7 @@ extern struct fmt_main fmt_opencl_pwsafe;
 extern struct fmt_main fmt_opencl_rar;
 extern struct fmt_main fmt_opencl_rawMD4;
 extern struct fmt_main fmt_opencl_rawMD5;
+extern struct fmt_main fmt_opencl_rawKeccak256;
 extern struct fmt_main fmt_opencl_rawSHA1;
 extern struct fmt_main fmt_opencl_rawsha256;
 extern struct fmt_main fmt_opencl_rawsha512;
@@ -388,6 +389,7 @@ static void john_register_all(void)
 		john_register_one(&fmt_opencl_rar);
 		john_register_one(&fmt_opencl_rawMD4);
 		john_register_one(&fmt_opencl_rawMD5);
+		john_register_one(&fmt_opencl_rawKeccak256);
 		john_register_one(&fmt_opencl_rawSHA1);
 		john_register_one(&fmt_opencl_rawsha256);
 		john_register_one(&fmt_opencl_rawsha512);
