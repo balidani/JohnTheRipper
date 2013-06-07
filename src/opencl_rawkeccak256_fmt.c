@@ -1,12 +1,18 @@
-/*
- * MD5 OpenCL code is based on Alain Espinosa's OpenCL patches.
+/* 
+ * Keccak-256 OpenCL version
+ * by Daniel Bali <balijanosdaniel at gmail.com>
+ * based on public domain code by Matt Mahoney
+ * based on rawKeccak256_fmt.c by Dhiru Kholia
  *
- * This software is Copyright (c) 2010, Dhiru Kholia <dhiru.kholia at gmail.com>
- * and Copyright (c) 2012, magnum
- * and it is hereby released to the general public under the following terms:
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted.
+ * Usage: john --format:raw-keccak-256-opencl <hash file>
+ *
+ * This file is part of John the Ripper password cracker,
+ * Copyright (c) 2013 by Solar Designer
+ *
  */
+
+// Remove me
+#include <stdio.h>
 
 #include <string.h>
 
@@ -19,19 +25,19 @@
 #include "config.h"
 #include "options.h"
 
-#define PLAINTEXT_LENGTH    55 /* Max. is 55 with current kernel */
+#define PLAINTEXT_LENGTH    55 // TODO
 #define BUFSIZE             ((PLAINTEXT_LENGTH+3)/4*4)
-#define FORMAT_LABEL        "raw-keccak-256-opencl"
+#define FORMAT_LABEL        "raw-keccak256-opencl"
 #define FORMAT_NAME         "Raw Keccak256"
 #define ALGORITHM_NAME      "OpenCL (inefficient, development use only)"
 #define BENCHMARK_COMMENT   ""
 #define BENCHMARK_LENGTH    -1
-#define CIPHERTEXT_LENGTH   32
-#define DIGEST_SIZE         16
-#define BINARY_SIZE         4
+#define CIPHERTEXT_LENGTH   64
+#define DIGEST_SIZE         32
+#define BINARY_SIZE         8
 #define SALT_SIZE           0
 
-#define FORMAT_TAG          "$dynamic_0$"
+#define FORMAT_TAG          "$keccak256$"
 #define TAG_LENGTH          (sizeof(FORMAT_TAG) - 1)
 
 cl_command_queue queue_prof;
@@ -48,7 +54,7 @@ static unsigned int key_idx = 0;
 #define MIN_KEYS_PER_CRYPT      1024
 #define MAX_KEYS_PER_CRYPT      (1024 * 2048)
 
-#define CONFIG_NAME             "rawmd5"
+#define CONFIG_NAME             "rawkeccak256"
 #define STEP                    65536
 
 static int have_full_hashes;
@@ -66,10 +72,7 @@ static int crypt_all(int *pcount, struct db_salt *_salt);
 static int crypt_all_benchmark(int *pcount, struct db_salt *_salt);
 
 static struct fmt_tests tests[] = {
-	{"098f6bcd4621d373cade4e832627b4f6", "test"},
-	{FORMAT_TAG "378e2c4a07968da2eca692320136433d","thatsworking"},
-	{FORMAT_TAG "8ad8757baa8564dc136c1e07507f4a98","test3"},
-	{"d41d8cd98f00b204e9800998ecf8427e", ""},
+	{"$keccak256$4e03657aea45a94fc7d47ba826c8d667c0d1e6e33a64a036ec44f58fa12d6c45", "abc"},
 	{NULL}
 };
 
@@ -135,7 +138,7 @@ static void done(void)
 
 /* ------- Try to find the best configuration ------- */
 /* --
-   This function could be used to calculated the best num
+   This function could be used to calculate the best num
    for the workgroup
    Work-items that make up a work-group (also referred to
    as the size of the work-group)
@@ -168,8 +171,8 @@ static void init(struct fmt_main *self)
 {
 	size_t selected_gws, max_mem;
 
-	opencl_init("$JOHN/kernels/md5_kernel.cl", ocl_gpu_id);
-	crypt_kernel = clCreateKernel(program[ocl_gpu_id], "md5", &ret_code);
+	opencl_init("$JOHN/kernels/keccak256_kernel.cl", ocl_gpu_id);
+	crypt_kernel = clCreateKernel(program[ocl_gpu_id], "keccak256", &ret_code);
 	HANDLE_CLERROR(ret_code, "Error creating kernel. Double-check kernel name?");
 
 	local_work_size = global_work_size = 0;
@@ -325,7 +328,8 @@ static int crypt_all_benchmark(int *pcount, struct db_salt *salt)
 static int crypt_all(int *pcount, struct db_salt *salt)
 {
 	int count = *pcount;
-
+    int i = 0;
+    
 	global_work_size = (count + local_work_size - 1) / local_work_size * local_work_size;
 
 	// copy keys to the device
@@ -337,7 +341,7 @@ static int crypt_all(int *pcount, struct db_salt *salt)
 	// read back partial hashes
 	HANDLE_CLERROR(clEnqueueReadBuffer(queue[ocl_gpu_id], buffer_out, CL_TRUE, 0, sizeof(cl_uint) * global_work_size, partial_hashes, 0, NULL, NULL), "failed in reading data back");
 	have_full_hashes = 0;
-
+    
 	return count;
 }
 
@@ -360,21 +364,24 @@ static int cmp_one(void *binary, int index)
 static int cmp_exact(char *source, int index)
 {
 	unsigned int *t = (unsigned int *) get_binary(source);
-
-	if (!have_full_hashes) {
+    int i;
+    
+	if (!have_full_hashes) 
+    {
 		clEnqueueReadBuffer(queue[ocl_gpu_id], buffer_out, CL_TRUE,
 		        sizeof(cl_uint) * (global_work_size),
-		        sizeof(cl_uint) * 3 * global_work_size,
+		        sizeof(cl_uint) * 7 * global_work_size,
 		        res_hashes, 0, NULL, NULL);
 		have_full_hashes = 1;
 	}
-
-	if (t[1]!=res_hashes[index])
+    
+	if (t[1]!=res_hashes[index]) 
 		return 0;
-	if (t[2]!=res_hashes[1*global_work_size+index])
-		return 0;
-	if (t[3]!=res_hashes[2*global_work_size+index])
-		return 0;
+    
+    for (i = 2; i < 8; ++i) 
+        if (t[i]!=res_hashes[(i-1)*global_work_size+index]) 
+            return 0;
+    
 	return 1;
 }
 
