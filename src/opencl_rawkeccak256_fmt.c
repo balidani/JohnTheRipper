@@ -22,20 +22,20 @@
 #include "config.h"
 #include "options.h"
 
-#define PLAINTEXT_LENGTH    55 // TODO
-#define BUFSIZE             ((PLAINTEXT_LENGTH+3)/4*4)
-#define FORMAT_LABEL        "raw-keccak256-opencl"
-#define FORMAT_NAME         "Raw Keccak256"
-#define ALGORITHM_NAME      "OpenCL (inefficient, development use only)"
-#define BENCHMARK_COMMENT   ""
-#define BENCHMARK_LENGTH    -1
-#define CIPHERTEXT_LENGTH   64
-#define DIGEST_SIZE         32
-#define BINARY_SIZE         8
-#define SALT_SIZE           0
+#define PLAINTEXT_LENGTH	55 // TODO
+#define BUFSIZE				((PLAINTEXT_LENGTH+3)/4*4)
+#define FORMAT_LABEL		"raw-keccak256-opencl"
+#define FORMAT_NAME			"Raw Keccak256"
+#define ALGORITHM_NAME		"OpenCL (inefficient, development use only)"
+#define BENCHMARK_COMMENT	""
+#define BENCHMARK_LENGTH	-1
+#define CIPHERTEXT_LENGTH	64
+#define DIGEST_SIZE			32
+#define BINARY_SIZE			8
+#define SALT_SIZE			0
 
-#define FORMAT_TAG          "$keccak256$"
-#define TAG_LENGTH          (sizeof(FORMAT_TAG) - 1)
+#define FORMAT_TAG			"$keccak256$"
+#define TAG_LENGTH			(sizeof(FORMAT_TAG) - 1)
 
 cl_command_queue queue_prof;
 cl_mem pinned_saved_keys, pinned_saved_idx, pinned_partial_hashes;
@@ -45,25 +45,25 @@ static cl_uint *res_hashes;
 static unsigned int *saved_plain, *saved_idx;
 static unsigned int key_idx = 0;
 
-#define MIN(a, b)               (((a) > (b)) ? (b) : (a))
-#define MAX(a, b)               (((a) > (b)) ? (a) : (b))
+#define MIN(a, b)			(((a) > (b)) ? (b) : (a))
+#define MAX(a, b)			(((a) > (b)) ? (a) : (b))
 
-#define MIN_KEYS_PER_CRYPT      1024
-#define MAX_KEYS_PER_CRYPT      (1024 * 2048)
+#define MIN_KEYS_PER_CRYPT	1024
+#define MAX_KEYS_PER_CRYPT	(1024 * 2048)
 
-#define CONFIG_NAME             "rawkeccak256"
-#define STEP                    65536
+#define CONFIG_NAME			"rawkeccak256"
+#define STEP				65536
 
 static int have_full_hashes;
 
 static const char * warn[] = {
-	"pass xfer: "  ,  ", crypt: "    ,  ", result xfer: "
+	"pass xfer: "  ,  ", crypt: "	,  ", result xfer: "
 };
 
 extern void common_find_best_lws(size_t group_size_limit,
-        unsigned int sequential_id, cl_kernel crypt_kernel);
+		unsigned int sequential_id, cl_kernel crypt_kernel);
 extern void common_find_best_gws(int sequential_id, unsigned int rounds, int step,
-        unsigned long long int max_run_time);
+		unsigned long long int max_run_time);
 
 static int crypt_all(int *pcount, struct db_salt *_salt);
 static int crypt_all_benchmark(int *pcount, struct db_salt *_salt);
@@ -182,12 +182,12 @@ static void init(struct fmt_main *self)
 
 	// Initialize openCL tuning (library) for this format.
 	opencl_init_auto_setup(STEP, 0, 3, NULL, warn,
-	        &multi_profilingEvent[1], self, create_clobj,
-	        release_clobj, BUFSIZE, 0);
+			&multi_profilingEvent[1], self, create_clobj,
+			release_clobj, BUFSIZE, 0);
 	self->methods.crypt_all = crypt_all_benchmark;
 
 	self->params.max_keys_per_crypt = (global_work_size ?
-	        global_work_size : MAX_KEYS_PER_CRYPT);
+			global_work_size : MAX_KEYS_PER_CRYPT);
 	selected_gws = global_work_size;
 
 	if (!local_work_size) {
@@ -201,7 +201,7 @@ static void init(struct fmt_main *self)
 	if (local_work_size > get_current_work_group_size(ocl_gpu_id, crypt_kernel))
 		local_work_size = get_current_work_group_size(ocl_gpu_id, crypt_kernel);
 	clGetDeviceInfo(devices[ocl_gpu_id], CL_DEVICE_MAX_MEM_ALLOC_SIZE,
-	        sizeof(max_mem), &max_mem, NULL);
+			sizeof(max_mem), &max_mem, NULL);
 	while (global_work_size > MIN((1<<26)*4/56, max_mem / BUFSIZE))
 		global_work_size -= local_work_size;
 
@@ -212,8 +212,8 @@ static void init(struct fmt_main *self)
 	}
 	if (options.verbosity > 2)
 		fprintf(stderr,
-		        "Local worksize (LWS) %zd, global worksize (GWS) %zd\n",
-		        local_work_size, global_work_size);
+				"Local worksize (LWS) %zd, global worksize (GWS) %zd\n",
+				local_work_size, global_work_size);
 	self->params.min_keys_per_crypt = local_work_size;
 	self->params.max_keys_per_crypt = global_work_size;
 	self->methods.crypt_all = crypt_all;
@@ -330,7 +330,7 @@ static int crypt_all_benchmark(int *pcount, struct db_salt *salt)
 static int crypt_all(int *pcount, struct db_salt *salt)
 {
 	int count = *pcount;
-    
+	
 	global_work_size = (count + local_work_size - 1) / local_work_size * local_work_size;
 
 	// copy keys to the device
@@ -342,7 +342,7 @@ static int crypt_all(int *pcount, struct db_salt *salt)
 	// read back partial hashes
 	HANDLE_CLERROR(clEnqueueReadBuffer(queue[ocl_gpu_id], buffer_out, CL_TRUE, 0, sizeof(cl_uint) * global_work_size, partial_hashes, 0, NULL, NULL), "failed in reading data back");
 	have_full_hashes = 0;
-    
+	
 	return count;
 }
 
@@ -365,24 +365,24 @@ static int cmp_one(void *binary, int index)
 static int cmp_exact(char *source, int index)
 {
 	unsigned int *t = (unsigned int *) get_binary(source);
-    int i;
-    
+	int i;
+	
 	if (!have_full_hashes) 
-    {
+	{
 		clEnqueueReadBuffer(queue[ocl_gpu_id], buffer_out, CL_TRUE,
-		        sizeof(cl_uint) * (global_work_size),
-		        sizeof(cl_uint) * 7 * global_work_size,
-		        res_hashes, 0, NULL, NULL);
+				sizeof(cl_uint) * (global_work_size),
+				sizeof(cl_uint) * 7 * global_work_size,
+				res_hashes, 0, NULL, NULL);
 		have_full_hashes = 1;
 	}
-    
+	
 	if (t[1]!=res_hashes[index]) 
 		return 0;
-    
-    for (i = 2; i < 8; ++i) 
-        if (t[i]!=res_hashes[(i-1)*global_work_size+index]) 
-            return 0;
-    
+	
+	for (i = 2; i < 8; ++i) 
+		if (t[i]!=res_hashes[(i-1)*global_work_size+index]) 
+			return 0;
+	
 	return 1;
 }
 
