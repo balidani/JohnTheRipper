@@ -1,14 +1,11 @@
-/* 
- * Keccak-256 OpenCL version
- * by Daniel Bali <balijanosdaniel at gmail.com>
- * based on public domain code by Matt Mahoney
- * based on rawKeccak256_fmt.c by Dhiru Kholia
- *
- * Usage: john --format:raw-keccak-256-opencl <hash file>
- *
- * This file is part of John the Ripper password cracker,
- * Copyright (c) 2013 by Solar Designer
- *
+/*
+ * Keccak-f[1600] 256bit OpenCL
+ * This software is Copyright (2013) Daniel Bali <balijanosdaniel at gmail.com>,
+ * and it is hereby released to the general public under the following terms:
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted.
+ * Code is based on:
+ * - rawKeccak256_fmt.c by Dhiru Kholia
  */
 
 // Remove me
@@ -72,7 +69,12 @@ static int crypt_all(int *pcount, struct db_salt *_salt);
 static int crypt_all_benchmark(int *pcount, struct db_salt *_salt);
 
 static struct fmt_tests tests[] = {
+	{"$keccak256$03e4e5ecfffaffe3728385714072a7db00700be157e11a9c21002071bd6788d9", "openwall"},
+	{"$keccak256$9c4b7a6b4af91b44be8d9bb66d41e82589f01974702d3bf1d9b4407a55593c3c", "john"},
 	{"$keccak256$4e03657aea45a94fc7d47ba826c8d667c0d1e6e33a64a036ec44f58fa12d6c45", "abc"},
+	{"$keccak256$c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470", ""},
+	{"$keccak256$64a9ecdbdf4acaf9e5ff535ee9b20fa371b352133bda4d9e159b36f428adad16", 
+		"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
 	{NULL}
 };
 
@@ -90,7 +92,7 @@ static void create_clobj(int kpc, struct fmt_main * self)
 	saved_idx = clEnqueueMapBuffer(queue[ocl_gpu_id], pinned_saved_idx, CL_TRUE, CL_MAP_READ | CL_MAP_WRITE, 0, 4 * kpc, 0, NULL, NULL, &ret_code);
 	HANDLE_CLERROR(ret_code, "Error mapping page-locked memory saved_idx");
 
-	res_hashes = malloc(sizeof(cl_uint) * 3 * kpc);
+	res_hashes = malloc(sizeof(cl_uint) * 7 * kpc);
 
 	pinned_partial_hashes = clCreateBuffer(context[ocl_gpu_id], CL_MEM_WRITE_ONLY | CL_MEM_ALLOC_HOST_PTR, 4 * kpc, NULL, &ret_code);
 	HANDLE_CLERROR(ret_code, "Error creating page-locked memory pinned_partial_hashes");
@@ -328,7 +330,6 @@ static int crypt_all_benchmark(int *pcount, struct db_salt *salt)
 static int crypt_all(int *pcount, struct db_salt *salt)
 {
 	int count = *pcount;
-    int i = 0;
     
 	global_work_size = (count + local_work_size - 1) / local_work_size * local_work_size;
 

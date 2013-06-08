@@ -1,12 +1,11 @@
-/* 
- * Keccak-256 OpenCL kernel
- * by Daniel Bali <balijanosdaniel at gmail.com>
- * based on public domain code by Matt Mahoney
- * based on rawKeccak256_fmt.c by Dhiru Kholia
- *
- * This file is part of John the Ripper password cracker,
- * Copyright (c) 2013 by Solar Designer
- *
+/*
+ * Keccak-f[1600] 256bit OpenCL
+ * This software is Copyright (2013) Daniel Bali <balijanosdaniel at gmail.com>,
+ * and it is hereby released to the general public under the following terms:
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted.
+ * Code is based on:
+ * - public domain code by Matt Mahoney
  */
 
 #include "opencl_device_info.h"
