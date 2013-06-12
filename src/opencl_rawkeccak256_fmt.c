@@ -371,7 +371,7 @@ static int cmp_exact(char *source, int index)
 	{
 		clEnqueueReadBuffer(queue[ocl_gpu_id], buffer_out, CL_TRUE,
 				sizeof(cl_uint) * (global_work_size),
-				sizeof(cl_uint) * 7 * global_work_size,
+				sizeof(cl_uint) * (BINARY_SIZE - 1) * global_work_size,
 				res_hashes, 0, NULL, NULL);
 		have_full_hashes = 1;
 	}
@@ -379,7 +379,7 @@ static int cmp_exact(char *source, int index)
 	if (t[1]!=res_hashes[index]) 
 		return 0;
 	
-	for (i = 2; i < 8; ++i) 
+	for (i = 2; i < BINARY_SIZE; ++i) 
 		if (t[i]!=res_hashes[(i-1)*global_work_size+index]) 
 			return 0;
 	
