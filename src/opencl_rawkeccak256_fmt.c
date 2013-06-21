@@ -55,6 +55,7 @@ static unsigned int key_idx = 0;
 #define STEP				65536
 
 static int have_full_hashes;
+static int benchmark;
 
 static const char * warn[] = {
 	"pass xfer: "  ,  ", crypt: "	,  ", result xfer: "
@@ -66,7 +67,6 @@ extern void common_find_best_gws(int sequential_id, unsigned int rounds, int ste
 		unsigned long long int max_run_time);
 
 static int crypt_all(int *pcount, struct db_salt *_salt);
-static int crypt_all_benchmark(int *pcount, struct db_salt *_salt);
 
 static struct fmt_tests tests[] = {
 	{"$keccak256$03e4e5ecfffaffe3728385714072a7db00700be157e11a9c21002071bd6788d9", "openwall"},
@@ -184,7 +184,9 @@ static void init(struct fmt_main *self)
 	opencl_init_auto_setup(STEP, 0, 3, NULL, warn,
 			&multi_profilingEvent[1], self, create_clobj,
 			release_clobj, BUFSIZE, 0);
-	self->methods.crypt_all = crypt_all_benchmark;
+
+	benchmark = 1;
+	self->methods.crypt_all = crypt_all;
 
 	self->params.max_keys_per_crypt = (global_work_size ?
 			global_work_size : MAX_KEYS_PER_CRYPT);
@@ -216,7 +218,9 @@ static void init(struct fmt_main *self)
 				local_work_size, global_work_size);
 	self->params.min_keys_per_crypt = local_work_size;
 	self->params.max_keys_per_crypt = global_work_size;
-	self->methods.crypt_all = crypt_all;
+
+	benchmark = 0;
+	// self->methods.crypt_all = crypt_all;
 }
 
 static int valid(char *ciphertext, struct fmt_main *self)
@@ -308,39 +312,31 @@ static char *get_key(int index)
 	return out;
 }
 
-static int crypt_all_benchmark(int *pcount, struct db_salt *salt)
-{
-	int count = *pcount;
-
-	global_work_size = (count + local_work_size - 1) / local_work_size * local_work_size;
-
-	// copy keys to the device
-	BENCH_CLERROR(clEnqueueWriteBuffer(queue[ocl_gpu_id], buffer_keys, CL_TRUE, 0, 4 * key_idx, saved_plain, 0, NULL, &multi_profilingEvent[0]), "failed in clEnqueueWriteBuffer buffer_keys");
-	BENCH_CLERROR(clEnqueueWriteBuffer(queue[ocl_gpu_id], buffer_idx, CL_TRUE, 0, 4 * global_work_size, saved_idx, 0, NULL, &multi_profilingEvent[0]), "failed in clEnqueueWriteBuffer buffer_idx");
-
-	BENCH_CLERROR(clEnqueueNDRangeKernel(queue[ocl_gpu_id], crypt_kernel, 1, NULL, &global_work_size, &local_work_size, 0, NULL, &multi_profilingEvent[1]), "failed in clEnqueueNDRangeKernel");
-
-	// read back partial hashes
-	BENCH_CLERROR(clEnqueueReadBuffer(queue[ocl_gpu_id], buffer_out, CL_TRUE, 0, sizeof(cl_uint) * global_work_size, partial_hashes, 0, NULL, &multi_profilingEvent[2]), "failed in reading data back");
-	have_full_hashes = 0;
-
-	return count;
-}
-
 static int crypt_all(int *pcount, struct db_salt *salt)
 {
 	int count = *pcount;
+    cl_event *event = NULL;
 	
 	global_work_size = (count + local_work_size - 1) / local_work_size * local_work_size;
 
-	// copy keys to the device
-	HANDLE_CLERROR(clEnqueueWriteBuffer(queue[ocl_gpu_id], buffer_keys, CL_TRUE, 0, 4 * key_idx, saved_plain, 0, NULL, NULL), "failed in clEnqueueWriteBuffer buffer_keys");
-	HANDLE_CLERROR(clEnqueueWriteBuffer(queue[ocl_gpu_id], buffer_idx, CL_TRUE, 0, 4 * global_work_size, saved_idx, 0, NULL, NULL), "failed in clEnqueueWriteBuffer buffer_idx");
+#define HANDLE_BENCHCL(cl_error, message)								\
+        	if (benchmark) { BENCH_CLERROR((cl_error), (message)); }	\
+        	else { HANDLE_CLERROR((cl_error), (message)); }
 
-	HANDLE_CLERROR(clEnqueueNDRangeKernel(queue[ocl_gpu_id], crypt_kernel, 1, NULL, &global_work_size, &local_work_size, 0, NULL, NULL), "failed in clEnqueueNDRangeKernel");
+	// copy keys to the device
+	if (benchmark) event = &multi_profilingEvent[0];
+	HANDLE_BENCHCL(clEnqueueWriteBuffer(queue[ocl_gpu_id], buffer_keys, CL_TRUE, 0, 4 * key_idx, saved_plain, 0, NULL, event), "failed in clEnqueueWriteBuffer buffer_keys");
+	HANDLE_BENCHCL(clEnqueueWriteBuffer(queue[ocl_gpu_id], buffer_idx, CL_TRUE, 0, 4 * global_work_size, saved_idx, 0, NULL, event), "failed in clEnqueueWriteBuffer buffer_idx");
+
+	if (benchmark) event = &multi_profilingEvent[1];
+	HANDLE_BENCHCL(clEnqueueNDRangeKernel(queue[ocl_gpu_id], crypt_kernel, 1, NULL, &global_work_size, &local_work_size, 0, NULL, event), "failed in clEnqueueNDRangeKernel");
 
 	// read back partial hashes
-	HANDLE_CLERROR(clEnqueueReadBuffer(queue[ocl_gpu_id], buffer_out, CL_TRUE, 0, sizeof(cl_uint) * global_work_size, partial_hashes, 0, NULL, NULL), "failed in reading data back");
+	if (benchmark) event = &multi_profilingEvent[2];
+	HANDLE_BENCHCL(clEnqueueReadBuffer(queue[ocl_gpu_id], buffer_out, CL_TRUE, 0, sizeof(cl_uint) * global_work_size, partial_hashes, 0, NULL, event), "failed in reading data back");
+
+#undef HANDLE_BENCHCL
+
 	have_full_hashes = 0;
 	
 	return count;
